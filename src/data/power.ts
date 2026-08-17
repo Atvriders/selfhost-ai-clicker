@@ -22,6 +22,7 @@ export const POWER: PowerDef[] = [
   { id: 'substation', name: 'Grid Substation Feed', flavor: 'Commercial power hookup', kW: 2000, cost: 1500000, emoji: '🔋' },
   { id: 'gasturbine', name: 'Gas Turbine Plant', flavor: 'Jet engines bolted to the floor', kW: 10000, cost: 6000000, emoji: '🏭' },
   { id: 'smr', name: 'Small Modular Reactor', flavor: 'Tiny atom, big watts', kW: 50000, cost: 30000000, emoji: '☢️' },
+  { id: 'hydro', name: 'Hydroelectric Dam', flavor: 'A whole river, politely redirected', kW: 200000, cost: 80000000, emoji: '🏞️' },
   { id: 'fusion', name: 'Fusion Plant', flavor: 'Always 10 years away — not anymore', kW: 500000, cost: 200000000, emoji: '⚛️' },
   { id: 'orbital', name: 'Orbital Solar Array', flavor: 'Power beamed down from space', kW: 5000000, cost: 1500000000, emoji: '🛰️' },
   { id: 'dyson', name: 'Dyson Swarm', flavor: 'The sun works for you now', kW: 100000000, cost: 12000000000, emoji: '🌌' },

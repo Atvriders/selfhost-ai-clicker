@@ -118,9 +118,9 @@ export default function UsersPanel({ d }: Props) {
 
       <div className="specs-block">
         <h3>Resource usage</h3>
-        <ResBar emoji="🧠" label="RAM" used={d.ramUseGB} total={d.ramGB} />
-        <ResBar emoji="🎛️" label="VRAM" used={d.vramUseGB} total={d.vramGB} />
-        <ResBar emoji="💾" label="Disk (models)" used={d.diskGB} total={d.diskTotalGB} />
+        <ResBar emoji="🧠" label="AI RAM" used={d.ramUseGB} total={d.ramPoolGB} />
+        <ResBar emoji="🎛️" label="AI VRAM" used={d.vramUseGB} total={d.vramPoolGB} />
+        <ResBar emoji="💾" label="Disk (library + replicas)" used={d.diskGB} total={d.diskTotalGB} />
       </div>
 
       <PromptFeed load={d.load} />

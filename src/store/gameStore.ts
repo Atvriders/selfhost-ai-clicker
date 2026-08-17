@@ -45,9 +45,9 @@ export interface Derived {
   servedTps: number;     // tokens/s actually served
   revenue: number;       // credits/s gross
   watts: number;
-  ramGB: number;         // total system RAM across all hardware
-  vramGB: number;        // total VRAM across all hardware
-  diskGB: number;        // total model files on disk (== disk used)
+  ramPoolGB: number;     // AI RAM pool across the fleet (inference allocatable)
+  vramPoolGB: number;    // AI VRAM pool across the fleet
+  diskGB: number;        // disk used: library + replica copies of the active model
   ramUseGB: number;      // RAM actually used
   vramUseGB: number;     // VRAM actually used
   diskTotalGB: number;   // total storage capacity
@@ -119,17 +119,26 @@ export function getDerived(s: GameState): Derived {
   const activeModel = ownedModels.length ? ownedModels[ownedModels.length - 1] : MODELS[0];
   const activeNews = s.news && Date.now() < s.news.endsAt ? s.news : null;
   const watts = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.watts, 0);
+  const rawCapacity =
+    HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.tokensPerSec, 0) * activeModel.speed;
+  const baseDemand = s.users * activeModel.demandPerUser;
+  const baseLoad = rawCapacity > 0 ? baseDemand / rawCapacity : (s.users > 0 ? Infinity : 0);
   const powerSupplyKW = POWER.reduce((a, p) => a + (s.power[p.id] ?? 0) * p.kW, 0);
-  const powerDemandKW = watts / 1000;
+  // Power draw breathes with load: idle servers draw 30% of nameplate watts.
+  const powerDemandKW = (watts / 1000) * (0.3 + 0.7 * Math.min(1, baseLoad));
   const powerMult = activeNews?.powerMult ?? 1;
   const powerFactor =
     powerSupplyKW <= 0 ? 0.1 : Math.min(1, (powerSupplyKW * powerMult) / powerDemandKW);
-  const capacity =
-    HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.tokensPerSec, 0) *
-    activeModel.speed * powerFactor;
-  const ramGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.ramGB, 0);
-  const vramGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.vramGB, 0);
-  const diskGB = MODELS.reduce((a, m) => a + (s.models[m.id] ? m.diskGB : 0), 0);
+  const capacity = rawCapacity * powerFactor;
+  // Serving pools: the RAM/VRAM the fleet allocates to inference (~2× the
+  // tier's default model footprint, capped at physical memory), so the usage
+  // bars sit at a meaningful 50–100% when the default model is loaded.
+  const ramPoolGB = HARDWARE.reduce(
+    (a, h) => a + (s.hardware[h.id] ?? 0) * Math.min(2 * h.ramUseGB, h.ramGB), 0
+  );
+  const vramPoolGB = HARDWARE.reduce(
+    (a, h) => a + (s.hardware[h.id] ?? 0) * Math.min(2 * h.vramUseGB, h.vramGB), 0
+  );
   const ramUseGB = HARDWARE.reduce((a, h) => {
     const count = s.hardware[h.id] ?? 0;
     const tier = HARDWARE.indexOf(h);
@@ -140,15 +149,24 @@ export function getDerived(s: GameState): Derived {
     const tier = HARDWARE.indexOf(h);
     return a + count * (tier >= activeModel.minTier ? activeModel.vramGB : h.vramUseGB);
   }, 0);
+  // Disk used = model library + one copy of the active model per eligible unit.
+  const diskGB =
+    MODELS.reduce((a, m) => a + (s.models[m.id] ? m.diskGB : 0), 0) +
+    HARDWARE.reduce((a, h) => {
+      const tier = HARDWARE.indexOf(h);
+      return a + (s.hardware[h.id] ?? 0) * (tier >= activeModel.minTier ? activeModel.diskGB : 0);
+    }, 0);
   const diskTotalGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.diskTotalGB, 0);
   const prestigeMult = 1 + 0.25 * s.ipos + 0.1 * s.perks.venture;
   const costGrowth = Math.max(1.05, HARDWARE_COST_GROWTH - 0.015 * s.perks.partner);
-  const demand = s.users * activeModel.demandPerUser;
+  const demand = baseDemand;
   const load = capacity > 0 ? demand / capacity : (s.users > 0 ? Infinity : 0);
   const servedTps = Math.min(capacity, demand);
   const revenue =
     servedTps * activeModel.revMult * BASE_RATE * prestigeMult * (activeNews?.revMult ?? 1);
-  const electricity = watts * ELECTRICITY_COST;
+  // Electricity = fuel for what you draw + upkeep on generator CAPACITY,
+  // so overbuying power carries a real (if gentle) running cost.
+  const electricity = watts * ELECTRICITY_COST + powerSupplyKW * 0.01;
   const clickPower =
     (BASE_CLICK_POWER +
       CLICK_UPGRADES.reduce((a, u) => a + (s.upgrades[u.id] ? u.power : 0), 0)) *
@@ -172,8 +190,8 @@ export function getDerived(s: GameState): Derived {
     servedTps,
     revenue,
     watts,
-    ramGB,
-    vramGB,
+    ramPoolGB,
+    vramPoolGB,
     diskGB,
     ramUseGB,
     vramUseGB,

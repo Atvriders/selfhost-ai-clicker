@@ -58,18 +58,17 @@ per-user demand was raised.
 | 🟥 Raspberry Pi 5 | 50 | 10 | 12 | 16 GB | — | 3 GB | — | 128 GB | 0.5 | 100 s | 5 |
 | 🟩 Jetson Orin Nano | 400 | 50 | 25 | 8 GB | — | 4 GB | — | 64 GB | 4.5 | 89 s | 17 |
 | 🟦 Mini PC N100 | 3,000 | 300 | 35 | 16 GB | — | 7 GB | — | 512 GB | 48 | 62 s | 60 |
-| 🔶 AMD AI Halo | 25,000 | 2,000 | 120 | 128 GB | 96 GB | 24 GB | 22 GB | 2 TB | 550 | 45 s | 250 |
-| 🎮 Quad-5090 WS | 200,000 | 12,000 | 2,000 | 128 GB | 128 GB | 12 GB | 46 GB | 4 TB | 5,400 | 37 s | 1,000 |
-| ⚡ DGX Spark | 1.5M | 70,000 | 170 | 128 GB | 128 GB | 126 GB | 126 GB | 4 TB | 44,100 | 34 s | 3,150 |
-| 🖥️ 1U 8×H200 | 12M | 400,000 | 8,000 | 2 TB | 1,128 GB | 64 GB | 263 GB | 60 TB | 374,000 | 32 s | 11,333 |
-| 🏗️ NVL72 Rack | 100M | 2.5M | 120,000 | 9 TB | 13,824 GB | 128 GB | 1,323 GB | 250 TB | 3.5M | 29 s | 40,000 |
-| 🏭 Data Hall | 1B | 20M | 1M | 295 TB | 442 TB | 4 TB | 42 TB | 8 PB | 35M | 29 s | 333K |
-| 🌐 Campus | 12B | 160M | 8M | 2.36 PB | 3.54 PB | 32 TB | 338 TB | 64 PB | 320M | 37 s | 2M |
+| 🔶 AMD AI Halo | 25,000 | 2,000 | 120 | 128 GB | 96 GB | 24 GB | 22 GB | 512 GB | 550 | 45 s | 250 |
+| 🎮 Quad-5090 WS | 200,000 | 12,000 | 2,000 | 128 GB | 128 GB | 12 GB | 46 GB | 1 TB | 5,400 | 37 s | 1,000 |
+| ⚡ DGX Spark | 1.5M | 70,000 | 170 | 128 GB | 128 GB | 126 GB | 126 GB | 1 TB | 44,100 | 34 s | 3,150 |
+| 🖥️ 1U 8×H200 | 12M | 400,000 | 8,000 | 2 TB | 1,128 GB | 64 GB | 263 GB | 10 TB | 374,000 | 32 s | 11,333 |
+| 🏗️ NVL72 Rack | 100M | 2.5M | 120,000 | 9 TB | 13,824 GB | 128 GB | 1,323 GB | 40 TB | 3.5M | 29 s | 40,000 |
+| 🏭 Data Hall | 1B | 20M | 1M | 295 TB | 442 TB | 4 TB | 42 TB | 500 TB | 35M | 29 s | 333K |
+| 🌐 Campus | 12B | 160M | 8M | 2.36 PB | 3.54 PB | 32 TB | 338 TB | 1 PB | 320M | 37 s | 2M |
 
 RAM/VRAM "use" = the tier's default model footprint (4-bit weights + KV
-cache + overhead). It is display data, but it is **real**: when the active
-model changes, eligible units switch to the model's footprint, so the bars
-move exactly as the fleet behaves.
+cache + overhead). Disk totals are **node-local storage** (big fleets mount
+shared storage separately — inference nodes don't carry exabytes each).
 
 ## Models (one-time licenses)
 
@@ -115,6 +114,7 @@ supply/demand (floor 10%), and latency +500 ms per missing fraction.
 | 🔋 Substation | 2,000 | 1.5M | 750 | half a data hall |
 | 🏭 Gas turbine | 10,000 | 6M | 600 | 10 data halls |
 | ☢️ SMR | 50,000 | 30M | 600 | 50 halls / 6 campuses |
+| 🏞️ Hydro dam | 200,000 | 80M | 400 | 25 campuses |
 | ⚛️ Fusion | 500,000 | 200M | 400 | 60 campuses |
 | 🛰️ Orbital solar | 5M | 1.5B | 300 | 600 campuses |
 | 🌌 Dyson swarm | 100M | 12B | 120 | the rest of the game |
@@ -196,8 +196,16 @@ best late, Growth early, Partner when buying many copies of one tier.
 
 - **Network**: `netMBps = servedTps / 50`.
 - **Latency**: `20 + 18×load + queue/40 + 500×(1−powerFactor)` ms.
-- **Electricity**: `watts × 0.001` CC/s — small but non-trivial at campus
-  scale (8 MW ≈ 2.5% of campus revenue), and nearly free on efficient
-  high-tier GPUs (revenue-per-watt grows ~100× up the ladder — on purpose:
-  bigger hardware is more profitable per watt).
+- **Power draw breathes with load**: idle servers draw 30% of nameplate,
+  so `demand = watts × (0.3 + 0.7×load)` — the power bar moves with traffic.
+- **Electricity** = `watts × 0.001` (fuel for what you draw) **+ `supply × 0.01`**
+  (upkeep on generator capacity). The capacity term makes overbuying power
+  — like a 5 GW orbital array for a 70 MW fleet — cost real money, which
+  rewards right-sizing your grid.
+- **Usage bars** measure the AI serving pool, not the whole machine:
+  `pool = Σ min(2× tier default footprint, physical memory)` per unit, so
+  RAM/VRAM bars sit at a meaningful 50–100% with the default model loaded,
+  move when you switch models, and can overflow if you cram a big model
+  onto a small fleet. Disk = model library + one replica copy of the active
+  model per eligible unit, against node-local storage totals.
 
