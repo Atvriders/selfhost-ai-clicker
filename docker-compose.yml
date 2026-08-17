@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  app:
+    image: ghcr.io/atvriders/selfhost-ai-clicker:latest
+    container_name: selfhost-ai-clicker
+    ports:
+      - "3020:3020"
+    restart: unless-stopped
