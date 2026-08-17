@@ -10,9 +10,14 @@ the load bar, and expand before your servers melt down.
 - **Click** to serve requests manually and earn Compute Credits.
 - **Buy hardware** to raise your token/s capacity. Each tier unlocks a
   bigger model that pays more per token but makes each user demand more.
+- **Real specs** — every unit lists its throughput (tokens/s), RAM, VRAM,
+  and the model's size on disk; the status panel shows fleet-wide totals.
 - **Watch users** grow. Load = demand ÷ capacity. Overload queues requests
   and, past the meltdown point, users start leaving.
 - **Buy marketing** for instant user spikes and permanent growth boosts.
+- **Go public** — at 1B lifetime credits you can IPO: reset your empire for
+  a permanent +25% earnings boost (prestige).
+- **Sounds** — synthesized click/purchase blips with a mute toggle.
 - **Expand** — the load bar will never let you forget.
 
 Progress auto-saves to localStorage, including up to 1 hour of offline

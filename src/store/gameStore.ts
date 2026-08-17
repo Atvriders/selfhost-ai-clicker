@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { HARDWARE, HARDWARE_COST_GROWTH, HardwareDef } from '../data/hardware';
 import { CLICK_UPGRADES, BASE_CLICK_POWER } from '../data/clickUpgrades';
 import { MARKETING } from '../data/marketing';
+import { sfx } from '../utils/sound';
 
 // ---------- Economy constants (tuning guide in BALANCE.md) ----------
 export const BASE_RATE = 0.05;          // credits per token/s served, scaled by model revMult
@@ -27,9 +28,13 @@ export interface Derived {
   servedTps: number;     // tokens/s actually served
   revenue: number;       // credits/s gross
   watts: number;
+  ramGB: number;         // total system RAM across all hardware
+  vramGB: number;        // total VRAM across all hardware
+  diskGB: number;        // total model files on disk
   electricity: number;   // credits/s
   net: number;           // credits/s after electricity
   clickPower: number;
+  prestigeMult: number;  // 1 + 0.25 × IPOs
   growthPerSec: number;  // signed users/s
   growthPct: number;     // % per second
   queueTps: number;      // unserved demand
@@ -46,6 +51,9 @@ export interface GameState {
   totalClicks: number;
   totalTokens: number;
   totalEarned: number;
+  lifetimeEarned: number; // never reset — gates IPOs
+  ipos: number;           // prestige count: +25% earnings each
+  soundOn: boolean;
   milestones: Milestone[];
   createdAt: number;
   lastSavedAt: number;
@@ -54,6 +62,8 @@ export interface GameState {
   buyHardware: (id: string) => void;
   buyUpgrade: (id: string) => void;
   buyMarketing: (id: string) => void;
+  ipo: () => void;
+  toggleSound: () => void;
   tick: (dt: number) => void;
   applyOffline: () => void;
   clearOfflineGain: () => void;
@@ -68,14 +78,19 @@ export function getDerived(s: GameState): Derived {
   const best = owned.length ? owned[owned.length - 1] : HARDWARE[0];
   const capacity = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.tokensPerSec, 0);
   const watts = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.watts, 0);
+  const ramGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.ramGB, 0);
+  const vramGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.vramGB, 0);
+  const diskGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.diskGB, 0);
+  const prestigeMult = 1 + 0.25 * s.ipos;
   const demand = s.users * best.demandPerUser;
   const load = capacity > 0 ? demand / capacity : (s.users > 0 ? Infinity : 0);
   const servedTps = Math.min(capacity, demand);
-  const revenue = servedTps * best.revMult * BASE_RATE;
+  const revenue = servedTps * best.revMult * BASE_RATE * prestigeMult;
   const electricity = watts * ELECTRICITY_COST;
   const clickPower =
-    BASE_CLICK_POWER +
-    CLICK_UPGRADES.reduce((a, u) => a + (s.upgrades[u.id] ? u.power : 0), 0);
+    (BASE_CLICK_POWER +
+      CLICK_UPGRADES.reduce((a, u) => a + (s.upgrades[u.id] ? u.power : 0), 0)) *
+    prestigeMult;
   const R = BASE_GROWTH + marketingGrowthSum(s.marketing);
   const growthPerSec = load <= 1
     ? s.users * R * Math.max(0, 1 - load) + (load < 1.2 ? SIGNUP_TRICKLE : 0)
@@ -88,9 +103,13 @@ export function getDerived(s: GameState): Derived {
     servedTps,
     revenue,
     watts,
+    ramGB,
+    vramGB,
+    diskGB,
     electricity,
     net: revenue - electricity,
     clickPower,
+    prestigeMult,
     growthPerSec,
     growthPct: s.users > 0 ? (growthPerSec / s.users) * 100 : 0,
     queueTps: Math.max(0, demand - capacity),
@@ -104,6 +123,11 @@ export function hardwareCost(id: string, ownedCount: number): number {
   return Math.round(def.cost * Math.pow(HARDWARE_COST_GROWTH, ownedCount));
 }
 
+/** Lifetime earnings required for IPO number N: 1B, 10B, 100B, ... */
+export function ipoRequirement(ipos: number): number {
+  return 1e9 * Math.pow(10, ipos);
+}
+
 const freshState = () => ({
   credits: 0,
   hardware: { rpi5: 1 } as Record<string, number>,
@@ -113,6 +137,9 @@ const freshState = () => ({
   totalClicks: 0,
   totalTokens: 0,
   totalEarned: 0,
+  lifetimeEarned: 0,
+  ipos: 0,
+  soundOn: true,
   milestones: [] as Milestone[],
   createdAt: Date.now(),
   lastSavedAt: Date.now(),
@@ -127,10 +154,12 @@ export const useGameStore = create<GameState>()(
       click: () =>
         set((s) => {
           const p = getDerived(s).clickPower;
+          if (s.soundOn) sfx.click();
           return {
             credits: s.credits + p,
             totalClicks: s.totalClicks + 1,
             totalEarned: s.totalEarned + p,
+            lifetimeEarned: s.lifetimeEarned + p,
           };
         }),
 
@@ -147,6 +176,7 @@ export const useGameStore = create<GameState>()(
                 at: Date.now(),
               }]
             : s.milestones;
+          if (s.soundOn) sfx.buy();
           return {
             credits: s.credits - cost,
             hardware: { ...s.hardware, [id]: count + 1 },
@@ -159,6 +189,7 @@ export const useGameStore = create<GameState>()(
           if (s.upgrades[id]) return {};
           const def = CLICK_UPGRADES.find((u) => u.id === id)!;
           if (s.credits < def.cost) return {};
+          if (s.soundOn) sfx.buy();
           return { credits: s.credits - def.cost, upgrades: { ...s.upgrades, [id]: true } };
         }),
 
@@ -167,6 +198,7 @@ export const useGameStore = create<GameState>()(
           if (s.marketing[id]) return {};
           const def = MARKETING.find((m) => m.id === id)!;
           if (s.credits < def.cost) return {};
+          if (s.soundOn) sfx.buy();
           return {
             credits: s.credits - def.cost,
             marketing: { ...s.marketing, [id]: true },
@@ -196,6 +228,7 @@ export const useGameStore = create<GameState>()(
             users,
             totalTokens: s.totalTokens + d.servedTps * dt,
             totalEarned: s.totalEarned + gained,
+            lifetimeEarned: s.lifetimeEarned + gained,
             lastSavedAt: Date.now(),
           };
         }),
@@ -207,6 +240,7 @@ export const useGameStore = create<GameState>()(
           if (elapsed < 60) return { lastSavedAt: now };
           const base = getDerived(s);
           const R = BASE_GROWTH + marketingGrowthSum(s.marketing);
+          const mult = 1 + 0.25 * s.ipos;
           let users = s.users;
           let credits = s.credits;
           let tokens = s.totalTokens;
@@ -214,7 +248,7 @@ export const useGameStore = create<GameState>()(
             const demand = users * base.best.demandPerUser;
             const load = base.capacity > 0 ? demand / base.capacity : 0;
             const served = Math.min(base.capacity, demand);
-            credits = Math.max(0, credits + (served * base.best.revMult * BASE_RATE - base.electricity));
+            credits = Math.max(0, credits + (served * base.best.revMult * BASE_RATE * mult - base.electricity));
             tokens += served;
             if (load <= 1) {
               users += users * R * Math.max(0, 1 - load) + (load < 1.2 ? SIGNUP_TRICKLE : 0);
@@ -228,12 +262,40 @@ export const useGameStore = create<GameState>()(
             users,
             totalTokens: tokens,
             totalEarned: s.totalEarned + (credits - s.credits),
+            lifetimeEarned: s.lifetimeEarned + (credits - s.credits),
             lastSavedAt: now,
             offlineGain: Math.round(credits - s.credits),
           };
         }),
 
       clearOfflineGain: () => set({ offlineGain: 0 }),
+
+      ipo: () =>
+        set((s) => {
+          const req = ipoRequirement(s.ipos);
+          if (s.lifetimeEarned < req) return {};
+          if (s.soundOn) sfx.prestige();
+          return {
+            credits: 0,
+            hardware: { rpi5: 1 },
+            upgrades: {},
+            marketing: {},
+            users: 10,
+            totalClicks: 0,
+            totalTokens: 0,
+            totalEarned: 0,
+            ipos: s.ipos + 1,
+            milestones: [...s.milestones.slice(-6), {
+              id: `ipo-${Date.now()}`,
+              text: `🏦 IPO #${s.ipos + 1}! Investor money floods in — +25% to all earnings`,
+              at: Date.now(),
+            }],
+            lastSavedAt: Date.now(),
+            offlineGain: 0,
+          };
+        }),
+
+      toggleSound: () => set((s) => ({ soundOn: !s.soundOn })),
 
       reset: () => set({ ...freshState(), lastSavedAt: Date.now() }),
     }),
@@ -249,6 +311,9 @@ export const useGameStore = create<GameState>()(
         totalClicks: s.totalClicks,
         totalTokens: s.totalTokens,
         totalEarned: s.totalEarned,
+        lifetimeEarned: s.lifetimeEarned,
+        ipos: s.ipos,
+        soundOn: s.soundOn,
         milestones: s.milestones,
         createdAt: s.createdAt,
         lastSavedAt: s.lastSavedAt,

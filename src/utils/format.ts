@@ -31,3 +31,10 @@ export function fmtWatts(w: number): string {
   if (w >= 1e3) return fmt(w / 1e3) + ' kW';
   return fmt(w) + ' W';
 }
+
+/** Byte display from GB: 229 -> "229 GB", 13824 -> "13.82 TB", 3.5M -> "3.54 PB" */
+export function fmtBytes(gb: number): string {
+  if (gb >= 1e6) return fmt(gb / 1e6) + ' PB';
+  if (gb >= 1e3) return fmt(gb / 1e3) + ' TB';
+  return fmt(gb) + ' GB';
+}

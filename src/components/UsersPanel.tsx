@@ -1,5 +1,5 @@
 import { useGameStore, type Derived } from '../store/gameStore';
-import { fmt, fmtInt, fmtRate } from '../utils/format';
+import { fmt, fmtInt, fmtRate, fmtBytes } from '../utils/format';
 
 interface Props {
   d: Derived;
@@ -67,6 +67,24 @@ export default function UsersPanel({ d }: Props) {
         <div className="cell">
           <span className="cell-label">Queued</span>
           <span className={`cell-value ${d.queueTps > 0 ? 'bad' : ''}`}>{fmt(d.queueTps)} tok/s</span>
+        </div>
+      </div>
+
+      <div className="specs-block">
+        <h3>Hardware specs</h3>
+        <div className="grid-stats three">
+          <div className="cell">
+            <span className="cell-label">🧠 Total RAM</span>
+            <span className="cell-value">{fmtBytes(d.ramGB)}</span>
+          </div>
+          <div className="cell">
+            <span className="cell-label">🎛️ Total VRAM</span>
+            <span className="cell-value">{fmtBytes(d.vramGB)}</span>
+          </div>
+          <div className="cell">
+            <span className="cell-label">💾 Models on disk</span>
+            <span className="cell-value">{fmtBytes(d.diskGB)}</span>
+          </div>
         </div>
       </div>
 

@@ -75,7 +75,26 @@ passive serving takes over — the classic clicker arc.
 - ~2–3 min: Orin Nano online
 - ~8–10 min: Mini PC, first marketing blitz
 - ~20–30 min: AMD AI Halo serving 32B models
-- ~1–2 h: DGX Spark, DeepSeek V3
+- ~1–2 h: DGX Spark, DeepSeek-R1 236B
 - ~1 day: first rack-mount servers and NVL72 racks
 
 (Exact times depend on click rate and marketing timing.)
+
+## Prestige (IPO)
+
+- IPO available when **lifetime** earnings (never reset) hit 1B CC; each
+  subsequent IPO needs ×10 more lifetime earnings (1B, 10B, 100B…).
+- Going public resets credits, hardware, upgrades, marketing and users, but
+  gives a **permanent +25%** multiplier on all earnings (click + passive).
+- The ×25% additive bonus keeps the endgame progressing: after the first IPO
+  the same climb is ~20% faster, and so on. Requirement growth (×10) vs bonus
+  growth (+25% each) means IPO #2+ happen roughly at the same point in each
+  run, so runs get faster without trivializing the mid-game.
+
+## Hardware specs (flavor stats)
+
+Each unit carries `ramGB`, `vramGB` and `diskGB` (model file size, ~4-bit
+quantized) so the UI can show both per-unit specs in the shop and fleet-wide
+RAM / VRAM / disk totals in the status panel. They do not affect the economy —
+they exist to make the self-hosting fantasy concrete (and VRAM totals get
+silly in a fun way once you own NVL72 racks).

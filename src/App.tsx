@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useGameStore, getDerived } from './store/gameStore';
+import { setSoundMuted } from './utils/sound';
 import Header from './components/Header';
 import ClickPanel from './components/ClickPanel';
 import UsersPanel from './components/UsersPanel';
@@ -12,7 +13,12 @@ export default function App() {
   const applyOffline = useGameStore((s) => s.applyOffline);
   const offlineGain = useGameStore((s) => s.offlineGain);
   const clearOfflineGain = useGameStore((s) => s.clearOfflineGain);
+  const soundOn = useGameStore((s) => s.soundOn);
   const d = useMemo(() => getDerived(state), [state]);
+
+  useEffect(() => {
+    setSoundMuted(!soundOn);
+  }, [soundOn]);
 
   useEffect(() => {
     applyOffline();

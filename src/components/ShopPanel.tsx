@@ -3,7 +3,7 @@ import { useGameStore, hardwareCost, BASE_RATE, type Derived } from '../store/ga
 import { HARDWARE } from '../data/hardware';
 import { CLICK_UPGRADES } from '../data/clickUpgrades';
 import { MARKETING } from '../data/marketing';
-import { fmt } from '../utils/format';
+import { fmt, fmtBytes } from '../utils/format';
 
 type Tab = 'hardware' | 'click' | 'market';
 
@@ -41,7 +41,7 @@ export default function ShopPanel({ d }: Props) {
             const count = hardware[h.id] ?? 0;
             const cost = hardwareCost(h.id, count);
             const afford = credits >= cost;
-            const fullRev = h.tokensPerSec * h.revMult * BASE_RATE;
+            const fullRev = h.tokensPerSec * h.revMult * BASE_RATE * d.prestigeMult;
             const locked = count === 0 && h !== HARDWARE[0] && !HARDWARE.slice(0, HARDWARE.indexOf(h)).every((p) => (hardware[p.id] ?? 0) > 0);
             return (
               <div key={h.id} className={`card ${locked ? 'locked' : ''}`}>
@@ -53,8 +53,11 @@ export default function ShopPanel({ d }: Props) {
                 <p className="card-flavor">{h.flavor}</p>
                 <div className="card-specs">
                   <span>⚙️ {fmt(h.tokensPerSec)} tok/s</span>
-                  <span>🤖 {h.model}</span>
+                  <span>🧠 {fmtBytes(h.ramGB)} RAM</span>
+                  <span>🎛️ {h.vramGB > 0 ? fmtBytes(h.vramGB) + ' VRAM' : 'CPU-only'}</span>
+                  <span>💾 {fmtBytes(h.diskGB)} on disk</span>
                   <span>⚡ {h.watts >= 1000 ? fmt(h.watts / 1000) + ' kW' : h.watts + ' W'}</span>
+                  <span>🤖 {h.model}</span>
                   <span>💰 up to {fmt(fullRev)}/s</span>
                 </div>
                 <button className="buy" disabled={!afford || locked} onClick={() => buyHardware(h.id)}>
