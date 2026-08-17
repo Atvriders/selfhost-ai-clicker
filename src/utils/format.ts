@@ -50,3 +50,10 @@ export function fmtDuration(sec: number): string {
   if (m > 0) return `${m}m ${s % 60}s`;
   return `${s}s`;
 }
+
+/** Power display: 1.5 -> "1.5 kW", 2000 -> "2 MW", 1e6 -> "1 GW" */
+export function fmtKW(kw: number): string {
+  if (kw >= 1e6) return fmt(kw / 1e6) + ' GW';
+  if (kw >= 1e3) return fmt(kw / 1e3) + ' MW';
+  return fmt(kw) + ' kW';
+}

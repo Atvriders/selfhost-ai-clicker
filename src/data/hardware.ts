@@ -22,6 +22,7 @@ export interface HardwareDef {
   vramUseGB: number;    // VRAM actually used by the model
   diskTotalGB: number;  // total storage on this machine
   model: string;        // best model this tier can serve
+  modelId: string;      // id of that model in MODELS
   revMult: number;      // revenue multiplier of that model
   demandPerUser: number;// tokens/s demanded per concurrent user
   emoji: string;
@@ -42,6 +43,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 0,
     diskTotalGB: 128,
     model: 'TinyLlama 1.5B',
+    modelId: 'tinyllama',
     revMult: 1.0,
     demandPerUser: 0.5,
     emoji: '🟥',
@@ -60,6 +62,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 0,
     diskTotalGB: 64,
     model: 'Llama 3.2 3B',
+    modelId: 'llama32-3b',
     revMult: 1.8,
     demandPerUser: 0.8,
     emoji: '🟩',
@@ -78,6 +81,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 0,
     diskTotalGB: 512,
     model: 'Llama 3.1 8B',
+    modelId: 'llama31-8b',
     revMult: 3.2,
     demandPerUser: 1.2,
     emoji: '🟦',
@@ -96,6 +100,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 22,
     diskTotalGB: 2000,
     model: 'Qwen2.5 32B',
+    modelId: 'qwen25-32b',
     revMult: 5.5,
     demandPerUser: 2,
     emoji: '🔶',
@@ -114,6 +119,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 46,
     diskTotalGB: 4000,
     model: 'Llama 3.3 70B',
+    modelId: 'llama33-70b',
     revMult: 9,
     demandPerUser: 3,
     emoji: '🎮',
@@ -132,6 +138,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 126,
     diskTotalGB: 4000,
     model: 'DeepSeek-R1 236B MoE (4-bit)',
+    modelId: 'dsr1-236b',
     revMult: 14,
     demandPerUser: 5,
     emoji: '⚡',
@@ -150,6 +157,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 263,
     diskTotalGB: 60000,
     model: 'Llama 4 Maverick (400B)',
+    modelId: 'maverick',
     revMult: 22,
     demandPerUser: 8,
     emoji: '🖥️',
@@ -168,6 +176,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 1323,
     diskTotalGB: 250000,
     model: 'Llama 4 Behemoth (2T)',
+    modelId: 'behemoth',
     revMult: 35,
     demandPerUser: 12,
     emoji: '🏗️',
@@ -186,6 +195,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 42336,
     diskTotalGB: 8000000,
     model: 'Behemoth Cluster',
+    modelId: 'behemoth-cluster',
     revMult: 35,
     demandPerUser: 12,
     emoji: '🏭',
@@ -204,6 +214,7 @@ export const HARDWARE: HardwareDef[] = [
     vramUseGB: 338688,
     diskTotalGB: 64000000,
     model: 'Frontier MegaMoE',
+    modelId: 'frontier-megamoe',
     revMult: 40,
     demandPerUser: 12,
     emoji: '🌐',

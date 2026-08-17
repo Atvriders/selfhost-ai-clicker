@@ -6,6 +6,7 @@ import ClickPanel from './components/ClickPanel';
 import UsersPanel from './components/UsersPanel';
 import ShopPanel from './components/ShopPanel';
 import PerkModal from './components/PerkModal';
+import NewsBanner from './components/NewsBanner';
 import { fmt } from './utils/format';
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
           🌙 While you were away: <b>+{fmt(offlineGain)} credits</b> and your users kept growing.
         </div>
       )}
+      <NewsBanner />
       <PerkModal />
     </div>
   );

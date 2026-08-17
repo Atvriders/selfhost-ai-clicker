@@ -101,11 +101,81 @@ passive serving takes over — the classic clicker arc.
   one tier. Requirement growth (×10) vs bonus growth keeps IPO #2+ landing
   at roughly the same point in each run.
 
-## Hardware specs (flavor stats)
+## Model library
 
-Each unit carries `ramGB` / `vramGB` / `diskGB` (model size) and
-`ramUseGB` / `vramUseGB` / `diskTotalGB` so the ops panel can show real
-resource bars: RAM, VRAM and disk used-vs-total. These are display-only —
-the economy is unchanged — but the used numbers are sized so CPU-only tiers
-live in RAM, GPU tiers fill VRAM, and model files stay proportional to real
-4-bit quantized weights.
+Models are now **separate one-time licenses** (shop tab 🧠 Models). Owning a
+model puts it on your disk forever; the best owned model your fleet can host
+becomes the active model.
+
+- `minTier` gates models to hardware: you need at least one unit of that tier.
+- `diskGB` adds to the permanent library footprint (disk bar).
+- `ramGB` / `vramGB` are per-replica serving memory: every unit at or above
+  the model's tier runs a replica at the model's footprint; older units keep
+  their default model's footprint.
+- `speed` scales fleet capacity (bigger MoEs are slower per unit).
+- License costs follow the same ~×8 curve as hardware (0 → 2.5B).
+
+Resource bars now reflect real management tradeoffs: licensing a bigger model
+fills disk, and switching to it (it auto-activates when hostable) pushes RAM /
+VRAM usage up.
+
+## News events
+
+Roughly every ~3 minutes a random event fires (one active at a time, 15–120 s):
+
+| Event | Effect |
+|---|---|
+| 🎉 Model release frenzy | ×2 user growth |
+| ☁️ MegaCorp cloud outage | ×1.5 revenue |
+| 🐦 Viral tweet | ×3 click power |
+| 📰 Tech press feature | +100 users, ×1.5 growth |
+| ⚡ Power surge | 0 revenue, 15 s |
+| 🧯 Security drill PR blowup | negative growth |
+| 🏷️ Supplier flash sale | -30% hardware prices |
+| 📡 Backhoe vs fiber | ×0.5 revenue |
+
+Events also write to the activity feed and show a countdown banner. They are
+persisted (with their end timestamps), so they survive reloads but never
+stack during offline play.
+
+## Power grid
+
+Hardware draws watts; your generators must cover the draw or the fleet
+**throttles**: served capacity scales by `supply / demand` (floor 10%), and
+latency blows up. Power is a real build order now — you buy servers AND the
+watts to feed them.
+
+| Source | kW | Cost |
+|---|---|---|
+| 🔌 Garage outlet | 1.5 | free |
+| ☀️ Rooftop solar | 5 | 2,000 |
+| ⛽ Gas generator | 20 | 15,000 |
+| 🌬️ Wind turbine | 50 | 40,000 |
+| 🛢️ Diesel bank | 150 | 120,000 |
+| 🌞 Solar farm | 500 | 400,000 |
+| 🔋 Substation | 2,000 | 1.5M |
+| 🏭 Gas turbine | 10,000 | 6M |
+| ☢️ SMR | 50,000 | 30M |
+| ⚛️ Fusion | 500,000 | 200M |
+| 🛰️ Orbital solar | 5M | 1.5B |
+| 🌌 Dyson swarm | 100M | 12B |
+
+Cost grows ~×7.5 per tier and ×1.15 per copy. You start with a 1.5 kW wall
+outlet — enough for early Pi clusters, but the first GPU rig forces a real
+power decision, and each hardware tier pulls you up the power ladder
+(1U servers ≈ gas generators, NVL72 racks ≈ solar farms, campuses ≈ SMRs).
+Electricity cost (credits/s) is still charged as a fuel/maintenance line and
+shows in the ops panel.
+
+## Demand per user (tokens/s)
+
+Each concurrent user consumes more tokens as models grow: 2 (1.5B) → 3 (3B)
+→ 5 (8B) → 8 (32B) → 12 (70B) → 20 (236B) → 30 (400B) → 50 (2T) → 60
+(cluster) → 80 (frontier). Combined with the revMult curve, bigger models
+raise both revenue-per-token and per-user load, so expansion pressure grows
+with every upgrade.
+
+## Network (flavor)
+
+`netMBps = servedTps / 50` — a display-only figure so the ops panel has a
+network number that scales with throughput.

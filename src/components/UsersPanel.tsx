@@ -1,5 +1,5 @@
 import { useGameStore, type Derived } from '../store/gameStore';
-import { fmt, fmtInt, fmtRate, fmtBytes, fmtDuration } from '../utils/format';
+import { fmt, fmtInt, fmtRate, fmtBytes, fmtDuration, fmtKW } from '../utils/format';
 import PromptFeed from './PromptFeed';
 
 interface Props {
@@ -15,14 +15,20 @@ function loadStatus(load: number): { text: string; cls: string } {
   return { text: '⛔ MELTDOWN — users are leaving!', cls: 'status-meltdown' };
 }
 
-function ResBar({ emoji, label, used, total }: { emoji: string; label: string; used: number; total: number }) {
+function ResBar({ emoji, label, used, total, format = fmtBytes }: {
+  emoji: string;
+  label: string;
+  used: number;
+  total: number;
+  format?: (n: number) => string;
+}) {
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
   const cls = pct < 60 ? 'res-ok' : pct < 85 ? 'res-busy' : 'res-warn';
   return (
     <div className="res-row">
       <div className="res-head">
         <span>{emoji} {label}</span>
-        <span className="res-nums">{fmtBytes(used)} / {fmtBytes(total)} · {Math.round(pct)}%</span>
+        <span className="res-nums">{format(used)} / {format(total)} · {Math.round(pct)}%</span>
       </div>
       <div className="res-bar">
         <div className={`res-fill ${cls}`} style={{ width: `${pct}%` }} />
@@ -30,6 +36,8 @@ function ResBar({ emoji, label, used, total }: { emoji: string; label: string; u
     </div>
   );
 }
+
+const fmtKWBar = (n: number) => fmtKW(n);
 
 export default function UsersPanel({ d }: Props) {
   const users = useGameStore((s) => s.users);
@@ -87,6 +95,25 @@ export default function UsersPanel({ d }: Props) {
           <span className="cell-label">Queued</span>
           <span className={`cell-value ${d.queueTps > 0 ? 'bad' : ''}`}>{fmt(d.queueTps)} tok/s</span>
         </div>
+        <div className="cell">
+          <span className="cell-label">⚡ Electricity</span>
+          <span className="cell-value">-{fmt(d.electricity)}/s</span>
+        </div>
+        <div className="cell">
+          <span className="cell-label">🌐 Network</span>
+          <span className="cell-value">{fmt(d.netMBps)} MB/s</span>
+        </div>
+      </div>
+
+      <div className="specs-block">
+        <h3>⚡ Power</h3>
+        <ResBar emoji="⚡" label="Power" used={d.powerDemandKW} total={d.powerSupplyKW} format={fmtKWBar} />
+        {!d.powerOk && (
+          <p className="hint">
+            ⚠️ Not enough power! The fleet is throttled to <b>{Math.round(d.powerFactor * 100)}%</b> capacity.
+            Buy generators in the ⚡ Power tab.
+          </p>
+        )}
       </div>
 
       <div className="specs-block">
@@ -101,7 +128,7 @@ export default function UsersPanel({ d }: Props) {
       <div className="model-block">
         <h3>Currently hosting</h3>
         <p className="model-name">🤖 {d.bestModel}</p>
-        <p className="dim">revenue multiplier ×{d.bestRevMult} · {fmt(d.best.demandPerUser)} tok/s per user</p>
+        <p className="dim">revenue multiplier ×{d.bestRevMult} · {fmt(d.activeModel.demandPerUser)} tok/s per user</p>
         {d.queueTps > 0 && (
           <p className="hint">
             💡 Users are waiting on <b>{fmt(d.queueTps)} tok/s</b> of unserved demand.

@@ -10,12 +10,22 @@ the load bar, and expand before your servers melt down.
 - **Click** to serve requests manually and earn Compute Credits.
 - **Buy hardware** to raise your token/s capacity. Each tier unlocks a
   bigger model that pays more per token but makes each user demand more.
+- **Buy models** — a growing library of licensable models (TinyLlama →
+  Frontier MegaMoE). Each takes disk space, and the active model's replicas
+  consume RAM/VRAM — manage your resources.
+- **Keep the lights on** — every server draws power. Buy solar, gas,
+  diesel, turbines, reactors and eventually a Dyson swarm; run out of watts
+  and the whole fleet throttles.
 - **Real specs** — every unit lists its throughput (tokens/s), RAM, VRAM,
   and the model's size on disk; the ops panel shows fleet-wide RAM / VRAM /
-  disk usage bars, latency, requests/s and uptime.
+  disk usage bars, power draw, electricity cost, network throughput,
+  latency, requests/s and uptime.
 - **Your fleet** — a live rack view with one blinking LED per unit.
 - **Live request feed** — watch fake user prompts stream in (and start
   queueing when you overload).
+- **News events** — random high-activity moments: model release hype, cloud
+  outages, viral tweets, flash sales, power surges and more, each with live
+  effects and a countdown banner.
 - **Watch users** grow. Load = demand ÷ capacity. Overload queues requests
   and, past the meltdown point, users start leaving.
 - **Buy marketing** for instant user spikes and permanent growth boosts.
