@@ -86,15 +86,26 @@ passive serving takes over — the classic clicker arc.
   subsequent IPO needs ×10 more lifetime earnings (1B, 10B, 100B…).
 - Going public resets credits, hardware, upgrades, marketing and users, but
   gives a **permanent +25%** multiplier on all earnings (click + passive).
-- The ×25% additive bonus keeps the endgame progressing: after the first IPO
-  the same climb is ~20% faster, and so on. Requirement growth (×10) vs bonus
-  growth (+25% each) means IPO #2+ happen roughly at the same point in each
-  run, so runs get faster without trivializing the mid-game.
+- Each IPO also awards **one investor perk** (player's choice):
+
+| Perk | Effect | Stacking |
+|---|---|---|
+| 💰 Venture Money | +10% earnings | additive, uncapped |
+| 📈 Growth Hacker | +0.15%/s user growth | additive into R |
+| 🛠️ Hardware Partner | -1.5% hardware cost growth | growth floor at 5% (1.05) |
+
+- Venture Money stacks with the base +25% into `prestigeMult`:
+  `1 + 0.25×ipos + 0.10×venture`.
+- Hardware Partner shrinks the per-copy cost multiplier (1.13 → 1.05 at 5
+  perks), which matters most in the late game where you buy many copies of
+  one tier. Requirement growth (×10) vs bonus growth keeps IPO #2+ landing
+  at roughly the same point in each run.
 
 ## Hardware specs (flavor stats)
 
-Each unit carries `ramGB`, `vramGB` and `diskGB` (model file size, ~4-bit
-quantized) so the UI can show both per-unit specs in the shop and fleet-wide
-RAM / VRAM / disk totals in the status panel. They do not affect the economy —
-they exist to make the self-hosting fantasy concrete (and VRAM totals get
-silly in a fun way once you own NVL72 racks).
+Each unit carries `ramGB` / `vramGB` / `diskGB` (model size) and
+`ramUseGB` / `vramUseGB` / `diskTotalGB` so the ops panel can show real
+resource bars: RAM, VRAM and disk used-vs-total. These are display-only —
+the economy is unchanged — but the used numbers are sized so CPU-only tiers
+live in RAM, GPU tiers fill VRAM, and model files stay proportional to real
+4-bit quantized weights.

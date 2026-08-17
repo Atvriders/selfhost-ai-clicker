@@ -20,6 +20,18 @@ export interface Milestone {
   at: number;
 }
 
+export interface Perks {
+  venture: number; // 💰 +10% earnings each
+  growth: number;  // 📈 +0.15%/s user growth each
+  partner: number; // 🛠️ -1.5% hardware cost growth each (floor 5%)
+}
+
+export const PERK_DEFS: { id: keyof Perks; name: string; emoji: string; desc: string }[] = [
+  { id: 'venture', name: 'Venture Money', emoji: '💰', desc: '+10% to all earnings, forever' },
+  { id: 'growth', name: 'Growth Hacker', emoji: '📈', desc: '+0.15%/s user growth, forever' },
+  { id: 'partner', name: 'Hardware Partner', emoji: '🛠️', desc: '-1.5% cost scaling per hardware copy (floor 5%)' },
+];
+
 export interface Derived {
   best: HardwareDef;
   capacity: number;      // tokens/s total
@@ -30,11 +42,17 @@ export interface Derived {
   watts: number;
   ramGB: number;         // total system RAM across all hardware
   vramGB: number;        // total VRAM across all hardware
-  diskGB: number;        // total model files on disk
+  diskGB: number;        // total model files on disk (== disk used)
+  ramUseGB: number;      // RAM actually used
+  vramUseGB: number;     // VRAM actually used
+  diskTotalGB: number;   // total storage capacity
   electricity: number;   // credits/s
   net: number;           // credits/s after electricity
   clickPower: number;
-  prestigeMult: number;  // 1 + 0.25 × IPOs
+  prestigeMult: number;  // 1 + 0.25 × IPOs + 0.10 × venture perks
+  costGrowth: number;    // hardware cost multiplier per owned copy
+  latencyMs: number;     // p50 latency, rises with load
+  reqPerSec: number;     // requests per second
   growthPerSec: number;  // signed users/s
   growthPct: number;     // % per second
   queueTps: number;      // unserved demand
@@ -53,6 +71,8 @@ export interface GameState {
   totalEarned: number;
   lifetimeEarned: number; // never reset — gates IPOs
   ipos: number;           // prestige count: +25% earnings each
+  perks: Perks;           // IPO perk picks
+  pendingPerk: boolean;   // waiting for player to pick an IPO perk
   soundOn: boolean;
   milestones: Milestone[];
   createdAt: number;
@@ -63,6 +83,7 @@ export interface GameState {
   buyUpgrade: (id: string) => void;
   buyMarketing: (id: string) => void;
   ipo: () => void;
+  choosePerk: (id: keyof Perks) => void;
   toggleSound: () => void;
   tick: (dt: number) => void;
   applyOffline: () => void;
@@ -81,7 +102,11 @@ export function getDerived(s: GameState): Derived {
   const ramGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.ramGB, 0);
   const vramGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.vramGB, 0);
   const diskGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.diskGB, 0);
-  const prestigeMult = 1 + 0.25 * s.ipos;
+  const ramUseGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.ramUseGB, 0);
+  const vramUseGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.vramUseGB, 0);
+  const diskTotalGB = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.diskTotalGB, 0);
+  const prestigeMult = 1 + 0.25 * s.ipos + 0.1 * s.perks.venture;
+  const costGrowth = Math.max(1.05, HARDWARE_COST_GROWTH - 0.015 * s.perks.partner);
   const demand = s.users * best.demandPerUser;
   const load = capacity > 0 ? demand / capacity : (s.users > 0 ? Infinity : 0);
   const servedTps = Math.min(capacity, demand);
@@ -91,10 +116,12 @@ export function getDerived(s: GameState): Derived {
     (BASE_CLICK_POWER +
       CLICK_UPGRADES.reduce((a, u) => a + (s.upgrades[u.id] ? u.power : 0), 0)) *
     prestigeMult;
-  const R = BASE_GROWTH + marketingGrowthSum(s.marketing);
+  const R = BASE_GROWTH + marketingGrowthSum(s.marketing) + 0.0015 * s.perks.growth;
   const growthPerSec = load <= 1
     ? s.users * R * Math.max(0, 1 - load) + (load < 1.2 ? SIGNUP_TRICKLE : 0)
     : -s.users * Math.min(CHURN_CAP, CHURN_COEF * (load - 1));
+  const latencyMs = Math.round(20 + 18 * Math.min(load, 3) + Math.max(0, demand - capacity) / 40);
+  const reqPerSec = demand / 150; // ~150 tokens per request
   return {
     best,
     capacity,
@@ -106,21 +133,27 @@ export function getDerived(s: GameState): Derived {
     ramGB,
     vramGB,
     diskGB,
+    ramUseGB,
+    vramUseGB,
+    diskTotalGB,
     electricity,
     net: revenue - electricity,
     clickPower,
     prestigeMult,
+    costGrowth,
     growthPerSec,
     growthPct: s.users > 0 ? (growthPerSec / s.users) * 100 : 0,
     queueTps: Math.max(0, demand - capacity),
+    latencyMs,
+    reqPerSec,
     bestModel: best.model,
     bestRevMult: best.revMult,
   };
 }
 
-export function hardwareCost(id: string, ownedCount: number): number {
+export function hardwareCost(id: string, ownedCount: number, growth: number = HARDWARE_COST_GROWTH): number {
   const def = HARDWARE.find((h) => h.id === id)!;
-  return Math.round(def.cost * Math.pow(HARDWARE_COST_GROWTH, ownedCount));
+  return Math.round(def.cost * Math.pow(growth, ownedCount));
 }
 
 /** Lifetime earnings required for IPO number N: 1B, 10B, 100B, ... */
@@ -139,6 +172,8 @@ const freshState = () => ({
   totalEarned: 0,
   lifetimeEarned: 0,
   ipos: 0,
+  perks: { venture: 0, growth: 0, partner: 0 } as Perks,
+  pendingPerk: false,
   soundOn: true,
   milestones: [] as Milestone[],
   createdAt: Date.now(),
@@ -166,7 +201,7 @@ export const useGameStore = create<GameState>()(
       buyHardware: (id) =>
         set((s) => {
           const count = s.hardware[id] ?? 0;
-          const cost = hardwareCost(id, count);
+          const cost = hardwareCost(id, count, getDerived(s).costGrowth);
           if (s.credits < cost) return {};
           const def = HARDWARE.find((h) => h.id === id)!;
           const milestones = count === 0
@@ -239,8 +274,8 @@ export const useGameStore = create<GameState>()(
           const elapsed = Math.min(Math.floor((now - s.lastSavedAt) / 1000), OFFLINE_CAP_S);
           if (elapsed < 60) return { lastSavedAt: now };
           const base = getDerived(s);
-          const R = BASE_GROWTH + marketingGrowthSum(s.marketing);
-          const mult = 1 + 0.25 * s.ipos;
+          const R = BASE_GROWTH + marketingGrowthSum(s.marketing) + 0.0015 * s.perks.growth;
+          const mult = 1 + 0.25 * s.ipos + 0.1 * s.perks.venture;
           let users = s.users;
           let credits = s.credits;
           let tokens = s.totalTokens;
@@ -273,7 +308,7 @@ export const useGameStore = create<GameState>()(
       ipo: () =>
         set((s) => {
           const req = ipoRequirement(s.ipos);
-          if (s.lifetimeEarned < req) return {};
+          if (s.lifetimeEarned < req || s.pendingPerk) return {};
           if (s.soundOn) sfx.prestige();
           return {
             credits: 0,
@@ -285,13 +320,30 @@ export const useGameStore = create<GameState>()(
             totalTokens: 0,
             totalEarned: 0,
             ipos: s.ipos + 1,
+            pendingPerk: true,
             milestones: [...s.milestones.slice(-6), {
               id: `ipo-${Date.now()}`,
-              text: `🏦 IPO #${s.ipos + 1}! Investor money floods in — +25% to all earnings`,
+              text: `🏦 IPO #${s.ipos + 1}! +25% earnings — pick your investor perk`,
               at: Date.now(),
             }],
             lastSavedAt: Date.now(),
             offlineGain: 0,
+          };
+        }),
+
+      choosePerk: (id) =>
+        set((s) => {
+          if (!s.pendingPerk) return {};
+          if (s.soundOn) sfx.buy();
+          const def = PERK_DEFS.find((p) => p.id === id)!;
+          return {
+            pendingPerk: false,
+            perks: { ...s.perks, [id]: s.perks[id] + 1 },
+            milestones: [...s.milestones.slice(-6), {
+              id: `perk-${Date.now()}`,
+              text: `${def.emoji} ${def.name} joined the cap table — ${def.desc}`,
+              at: Date.now(),
+            }],
           };
         }),
 
@@ -313,6 +365,8 @@ export const useGameStore = create<GameState>()(
         totalEarned: s.totalEarned,
         lifetimeEarned: s.lifetimeEarned,
         ipos: s.ipos,
+        perks: s.perks,
+        pendingPerk: s.pendingPerk,
         soundOn: s.soundOn,
         milestones: s.milestones,
         createdAt: s.createdAt,

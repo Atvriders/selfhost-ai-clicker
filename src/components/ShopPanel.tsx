@@ -39,7 +39,7 @@ export default function ShopPanel({ d }: Props) {
         {tab === 'hardware' &&
           HARDWARE.map((h) => {
             const count = hardware[h.id] ?? 0;
-            const cost = hardwareCost(h.id, count);
+            const cost = hardwareCost(h.id, count, d.costGrowth);
             const afford = credits >= cost;
             const fullRev = h.tokensPerSec * h.revMult * BASE_RATE * d.prestigeMult;
             const locked = count === 0 && h !== HARDWARE[0] && !HARDWARE.slice(0, HARDWARE.indexOf(h)).every((p) => (hardware[p.id] ?? 0) > 0);

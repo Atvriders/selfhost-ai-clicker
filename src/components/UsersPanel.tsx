@@ -1,5 +1,6 @@
 import { useGameStore, type Derived } from '../store/gameStore';
-import { fmt, fmtInt, fmtRate, fmtBytes } from '../utils/format';
+import { fmt, fmtInt, fmtRate, fmtBytes, fmtDuration } from '../utils/format';
+import PromptFeed from './PromptFeed';
 
 interface Props {
   d: Derived;
@@ -14,8 +15,25 @@ function loadStatus(load: number): { text: string; cls: string } {
   return { text: '⛔ MELTDOWN — users are leaving!', cls: 'status-meltdown' };
 }
 
+function ResBar({ emoji, label, used, total }: { emoji: string; label: string; used: number; total: number }) {
+  const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+  const cls = pct < 60 ? 'res-ok' : pct < 85 ? 'res-busy' : 'res-warn';
+  return (
+    <div className="res-row">
+      <div className="res-head">
+        <span>{emoji} {label}</span>
+        <span className="res-nums">{fmtBytes(used)} / {fmtBytes(total)} · {Math.round(pct)}%</span>
+      </div>
+      <div className="res-bar">
+        <div className={`res-fill ${cls}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export default function UsersPanel({ d }: Props) {
   const users = useGameStore((s) => s.users);
+  const createdAt = useGameStore((s) => s.createdAt);
   const status = loadStatus(d.load);
   const loadPct = Math.min(100, d.load * 100);
   const barCls = !isFinite(d.load) ? 'bar-overload'
@@ -24,10 +42,11 @@ export default function UsersPanel({ d }: Props) {
     : d.load < 1 ? 'bar-warn'
     : d.load < 1.5 ? 'bar-overload'
     : 'bar-meltdown';
+  const uptime = fmtDuration((Date.now() - createdAt) / 1000);
 
   return (
     <section className="panel users-panel">
-      <h2 className="panel-title">Your Users</h2>
+      <h2 className="panel-title">Operations</h2>
 
       <div className="users-hero">
         <span className="users-count">{fmtInt(users)}</span>
@@ -37,7 +56,7 @@ export default function UsersPanel({ d }: Props) {
         {d.growthPerSec >= 0
           ? <span className="ok">+{fmtRate(d.growthPerSec)} signing up</span>
           : <span className="bad">{fmtRate(d.growthPerSec)} churning</span>}
-        <span className="dim"> · {fmt(d.growthPct)}%/s</span>
+        <span className="dim"> · {fmt(d.growthPct)}%/s · {fmt(d.reqPerSec)} req/s · {d.latencyMs} ms p50 · 🕐 {uptime}</span>
       </div>
 
       <div className="load-block">
@@ -71,22 +90,13 @@ export default function UsersPanel({ d }: Props) {
       </div>
 
       <div className="specs-block">
-        <h3>Hardware specs</h3>
-        <div className="grid-stats three">
-          <div className="cell">
-            <span className="cell-label">🧠 Total RAM</span>
-            <span className="cell-value">{fmtBytes(d.ramGB)}</span>
-          </div>
-          <div className="cell">
-            <span className="cell-label">🎛️ Total VRAM</span>
-            <span className="cell-value">{fmtBytes(d.vramGB)}</span>
-          </div>
-          <div className="cell">
-            <span className="cell-label">💾 Models on disk</span>
-            <span className="cell-value">{fmtBytes(d.diskGB)}</span>
-          </div>
-        </div>
+        <h3>Resource usage</h3>
+        <ResBar emoji="🧠" label="RAM" used={d.ramUseGB} total={d.ramGB} />
+        <ResBar emoji="🎛️" label="VRAM" used={d.vramUseGB} total={d.vramGB} />
+        <ResBar emoji="💾" label="Disk (models)" used={d.diskGB} total={d.diskTotalGB} />
       </div>
+
+      <PromptFeed load={d.load} />
 
       <div className="model-block">
         <h3>Currently hosting</h3>

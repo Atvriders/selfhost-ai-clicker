@@ -38,3 +38,15 @@ export function fmtBytes(gb: number): string {
   if (gb >= 1e3) return fmt(gb / 1e3) + ' TB';
   return fmt(gb) + ' GB';
 }
+
+/** Uptime display: 95 -> "1m 35s", 7320 -> "2h 2m", 100000 -> "1d 3h" */
+export function fmtDuration(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}

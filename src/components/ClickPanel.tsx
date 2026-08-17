@@ -1,5 +1,6 @@
 import { useGameStore, type Derived } from '../store/gameStore';
 import { fmt, fmtInt } from '../utils/format';
+import FleetPanel from './FleetPanel';
 
 interface Props {
   d: Derived;
@@ -29,6 +30,7 @@ export default function ClickPanel({ d }: Props) {
           <span className="mini-value">{fmt(totalTokens)}</span>
         </div>
       </div>
+      <FleetPanel />
       <div className="feed">
         <h3>Activity</h3>
         {milestones.length === 0 && <p className="feed-empty">Buy your first hardware upgrade to get started.</p>}

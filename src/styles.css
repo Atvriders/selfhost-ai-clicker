@@ -369,6 +369,160 @@
 }
 .grid-stats.three { grid-template-columns: 1fr 1fr 1fr; }
 
+/* ---------- Resource usage bars ---------- */
+.res-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.res-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: #c9d6df;
+}
+.res-nums { font-family: var(--mono); color: var(--dim); font-size: 10.5px; }
+.res-bar {
+  height: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.res-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.res-ok { background: linear-gradient(90deg, #10b981, #34d399); }
+.res-busy { background: linear-gradient(90deg, #d97706, #fbbf24); }
+.res-warn { background: linear-gradient(90deg, #dc2626, #f87171); }
+
+/* ---------- Live request feed ---------- */
+.prompt-feed h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+.prompt-feed ul { list-style: none; }
+.prompt-feed li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+  line-height: 1.35;
+  animation: feed-in 0.35s ease;
+}
+.prompt-feed li.queued .pf-prompt { color: var(--dim); text-decoration: line-through; }
+.pf-user { color: var(--accent); font-family: var(--mono); white-space: nowrap; }
+.pf-prompt { color: #c9d6df; }
+.pf-badge {
+  margin-left: auto;
+  font-size: 9.5px;
+  color: var(--busy);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+@keyframes feed-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Fleet visualization ---------- */
+.fleet { border-top: 1px solid var(--border); padding-top: 12px; }
+.fleet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.fleet-head h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+.fleet-count { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+.fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.fleet-tile {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.fleet-emoji { font-size: 17px; }
+.led {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 5px #34d399;
+  animation: led-blink 2.3s infinite;
+}
+@keyframes led-blink {
+  0%, 82%, 100% { opacity: 0.25; }
+  86% { opacity: 1; }
+  90% { opacity: 0.4; }
+  94% { opacity: 1; }
+}
+.fleet-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  border: 1px dashed var(--border-hi);
+  border-radius: 8px;
+}
+
+/* ---------- Perk modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 12, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 560px;
+  width: 92%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.modal h2 { font-size: 20px; margin-bottom: 4px; }
+.modal-sub { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+.perk-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.perk-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border-hi);
+  border-radius: 12px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--text);
+  text-align: center;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.perk-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.perk-emoji { font-size: 26px; }
+.perk-name { font-weight: 700; font-size: 13px; }
+.perk-desc { font-size: 11px; color: var(--dim); line-height: 1.4; }
+.perk-owned { font-family: var(--mono); font-size: 10px; color: var(--accent); }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {
   .main { grid-template-columns: 1fr; overflow-y: auto; }

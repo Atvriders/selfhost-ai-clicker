@@ -11,12 +11,17 @@ the load bar, and expand before your servers melt down.
 - **Buy hardware** to raise your token/s capacity. Each tier unlocks a
   bigger model that pays more per token but makes each user demand more.
 - **Real specs** — every unit lists its throughput (tokens/s), RAM, VRAM,
-  and the model's size on disk; the status panel shows fleet-wide totals.
+  and the model's size on disk; the ops panel shows fleet-wide RAM / VRAM /
+  disk usage bars, latency, requests/s and uptime.
+- **Your fleet** — a live rack view with one blinking LED per unit.
+- **Live request feed** — watch fake user prompts stream in (and start
+  queueing when you overload).
 - **Watch users** grow. Load = demand ÷ capacity. Overload queues requests
   and, past the meltdown point, users start leaving.
 - **Buy marketing** for instant user spikes and permanent growth boosts.
 - **Go public** — at 1B lifetime credits you can IPO: reset your empire for
-  a permanent +25% earnings boost (prestige).
+  a permanent +25% earnings boost plus one investor perk (more money, faster
+  growth, or cheaper hardware).
 - **Sounds** — synthesized click/purchase blips with a mute toggle.
 - **Expand** — the load bar will never let you forget.
 
