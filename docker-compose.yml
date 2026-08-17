@@ -7,3 +7,11 @@ services:
     ports:
       - "3020:3020"
     restart: unless-stopped
+
+# Static subnet so this stack never consumes Docker's default address pool
+# (avoids "all predefined address pools have been fully subnetted").
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.77.20.0/24
