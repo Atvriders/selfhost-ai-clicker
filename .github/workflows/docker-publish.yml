@@ -1,0 +1,53 @@
+name: build-and-push
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # GHCR — always
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/atvriders/selfhost-ai-clicker:latest
+            ghcr.io/atvriders/selfhost-ai-clicker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Gitea registry — optional cross-push. Add these repo secrets to
+      # enable it: GITEA_TOKEN (a token with package write scope), and
+      # optionally a repo variable GITEA_USERNAME (defaults to Atvriders).
+      - name: Push to Gitea registry (optional)
+        env:
+          GITEA_USERNAME: ${{ vars.GITEA_USERNAME || 'Atvriders' }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          if [ -z "$GITEA_TOKEN" ]; then
+            echo "GITEA_TOKEN secret not set — skipping Gitea push"
+            exit 0
+          fi
+          echo "$GITEA_TOKEN" | docker login git.waterburp.com -u "$GITEA_USERNAME" --password-stdin
+          docker tag ghcr.io/atvriders/selfhost-ai-clicker:latest \
+                     git.waterburp.com/atvriders/selfhost-ai-clicker:latest
+          docker push git.waterburp.com/atvriders/selfhost-ai-clicker:latest
