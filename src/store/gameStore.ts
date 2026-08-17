@@ -10,7 +10,7 @@ import { sfx } from '../utils/sound';
 
 // ---------- Economy constants (tuning guide in BALANCE.md) ----------
 export const BASE_RATE = 0.05;          // credits per token/s served, scaled by model revMult
-export const ELECTRICITY_COST = 0.0002; // credits per watt per second (flavor cost)
+export const ELECTRICITY_COST = 0.001;  // credits per watt per second (fuel/electricity)
 export const BASE_GROWTH = 0.005;       // user growth coefficient per second
 export const SIGNUP_TRICKLE = 0.05;     // absolute signups/s so users never hit 0
 export const CHURN_COEF = 0.015;        // churn per second per 1x overload
@@ -121,7 +121,9 @@ export function getDerived(s: GameState): Derived {
   const watts = HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.watts, 0);
   const powerSupplyKW = POWER.reduce((a, p) => a + (s.power[p.id] ?? 0) * p.kW, 0);
   const powerDemandKW = watts / 1000;
-  const powerFactor = powerSupplyKW <= 0 ? 0.1 : Math.min(1, powerSupplyKW / powerDemandKW);
+  const powerMult = activeNews?.powerMult ?? 1;
+  const powerFactor =
+    powerSupplyKW <= 0 ? 0.1 : Math.min(1, (powerSupplyKW * powerMult) / powerDemandKW);
   const capacity =
     HARDWARE.reduce((a, h) => a + (s.hardware[h.id] ?? 0) * h.tokensPerSec, 0) *
     activeModel.speed * powerFactor;
@@ -209,14 +211,14 @@ export function ipoRequirement(ipos: number): number {
 
 const freshState = () => ({
   credits: 0,
-  hardware: { rpi5: 1 } as Record<string, number>,
+  hardware: { rpi5: 2 } as Record<string, number>,
   upgrades: {} as Record<string, boolean>,
   marketing: {} as Record<string, boolean>,
   models: { tinyllama: true } as Record<string, boolean>,
   modelsGrantedV2: false,
   power: { outlet: 1 } as Record<string, number>,
   news: null as NewsEvent | null,
-  users: 10,
+  users: 8,
   totalClicks: 0,
   totalTokens: 0,
   totalEarned: 0,
@@ -437,13 +439,13 @@ export const useGameStore = create<GameState>()(
           if (s.soundOn) sfx.prestige();
           return {
             credits: 0,
-            hardware: { rpi5: 1 },
+            hardware: { rpi5: 2 },
             upgrades: {},
             marketing: {},
             models: { tinyllama: true },
             power: { outlet: 1 },
             news: null,
-            users: 10,
+            users: 8,
             totalClicks: 0,
             totalTokens: 0,
             totalEarned: 0,

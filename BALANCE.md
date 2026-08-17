@@ -1,17 +1,20 @@
 # SelfHost.AI Clicker — Balance Notes
 
+Everything in one place: the core loop, every price, every resource number,
+and why they are what they are. Tweak a value in code and update its table
+here — the two must never drift apart.
+
 ## Core loop
 
-You self-host AI models. Users send inference requests; you earn **Compute
-Credits (CC)** for every token you serve, then reinvest CC into hardware,
-clicking gear, and marketing. Buy too little hardware and your servers
-overload — users queue up and eventually leave.
+Users send inference requests. You earn **Compute Credits (CC)** per token
+served and reinvest into hardware, models, power, marketing and clicking gear.
 
 ```
-demand  = users × demandPerUser(best model)      [tokens/s]
-served  = min(capacity, demand)                  [tokens/s]
-revenue = served × revMult(best model) × 0.05    [CC/s]
-load    = demand / capacity                      [the number on the bar]
+demand   = users × demandPerUser(active model)                 [tok/s]
+capacity = Σ units × tokensPerSec × model.speed × powerFactor  [tok/s]
+served   = min(capacity, demand)                               [tok/s]
+revenue  = served × revMult × 0.05 × prestigeMult × news.revMult  [CC/s]
+load     = demand / capacity
 ```
 
 ## Economy constants (`src/store/gameStore.ts`)
@@ -20,162 +23,181 @@ load    = demand / capacity                      [the number on the bar]
 |---|---|---|
 | `BASE_RATE` | 0.05 | CC per token/s served, before model multiplier |
 | `HARDWARE_COST_GROWTH` | 1.13 | cost of each extra copy of the same hardware |
+| `POWER_COST_GROWTH` | 1.15 | cost of each extra copy of the same generator |
 | `BASE_GROWTH` | 0.005 | user growth coefficient (0.5%/s at zero load) |
 | `SIGNUP_TRICKLE` | 0.05 | absolute signups/s so the game never dead-ends |
 | `CHURN_COEF` / `CHURN_CAP` | 0.015 / 0.03 | overload churn: ≤3%/s of users |
-| `ELECTRICITY_COST` | 0.0002 | CC per watt/s (deliberately small flavor cost) |
-| `OFFLINE_CAP_S` | 3600 | offline earnings cap |
+| `ELECTRICITY_COST` | 0.001 | CC per watt/s (fuel + grid bill) |
+| `OFFLINE_CAP_S` | 3600 | offline earnings cap (1 hour) |
+| `NEWS_INTERVAL` | ~180 s | average time between news events (dt/180) |
 
-## Hardware curve
+Starting state: **2× Raspberry Pi 5, 8 users, TinyLlama, 1.5 kW wall outlet**.
+Demand (8 × 2 = 16 tok/s) vs capacity (20 tok/s) = 80% load: the "expand or
+churn" loop teaches itself in the first minute.
 
-Cost grows ~×8 per tier, so each tier is a meaningful wall, but full-load
-payback time stays in the 20–100 s range once you have the users to fill it.
-
-| Tier | Cost | Capacity | Rev/s @full | Users to saturate |
-|---|---|---|---|---|
-| Raspberry Pi 5 | 50 | 10 tok/s | 0.5 | 20 |
-| Jetson Orin Nano | 400 | 50 tok/s | 4.5 | 63 |
-| Mini PC N100 | 3,000 | 300 tok/s | 48 | 250 |
-| AMD AI Halo Mini PC | 25,000 | 2,000 tok/s | 550 | 1,000 |
-| Quad-RTX 5090 WS | 200,000 | 12,000 tok/s | 5,400 | 4,000 |
-| DGX Spark | 1.5M | 70,000 tok/s | 49,000 | 14,000 |
-| 1U 8×H200 | 12M | 400,000 tok/s | 440,000 | 50,000 |
-| NVL72 Rack | 100M | 2.5M tok/s | 4.4M | 208,000 |
-| Data Hall | 1B | 20M tok/s | 35M | 1.7M |
-| Hyperscale Campus | 12B | 160M tok/s | 320M | 13.3M |
-
-Because bigger models earn a higher `revMult` **and** demand more per user,
-upgrading hardware raises both your ceiling and the load pressure — the
-"expand or churn" tension drives the whole game.
-
-## User growth (logistic, so it can't overshoot forever)
+## User growth (logistic — cannot overshoot forever)
 
 ```
-growth/s = users × R × (1 − load) + trickle      when load ≤ 1
-churn/s  = users × min(0.03, 0.015 × (load − 1)) when load > 1
-R        = 0.005 + Σ marketing boosts (up to +0.0255)
+growth/s = users × R × (1 − load) + trickle     when load ≤ 1
+churn/s  = users × min(0.03, 0.015 × (load−1))  when load > 1
+R        = (0.005 + Σ marketing + 0.0015 × growth perks) × news.growthMult
 ```
 
-- At 50% load, ~0.25–1.5%/s growth depending on marketing.
-- Users asymptotically fill your capacity — the load bar will sit high and
-  nag you to expand.
-- Marketing adds users instantly and raises R permanently, so the best
-  strategy is: buy hardware → buy marketing → buy more hardware to catch
-  the spike.
+Marketing spikes users above capacity → they churn back down → buy hardware
+to catch them. That is the core loop.
 
-## Clicking
+## Hardware
 
-Base click is 1 CC; 12 one-time upgrades add up to ~81,000 CC/click with a
-×4–5 cost curve. Clicking carries the early game (~first 5 minutes), then
-passive serving takes over — the classic clicker arc.
+Cost grows ~×8 per tier (7.5–12×). Full-load payback is 29–100 s; it
+intentionally compresses at the top so late game stays snappy. Payback
+assumes enough users to fill the unit — users-to-saturate shrank ~4× when
+per-user demand was raised.
 
-## Milestone pacing targets
+| Tier | Cost | Tok/s | W | RAM | VRAM | RAM use | VRAM use | Disk | Rev/s @full | Payback | Users to fill |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 🟥 Raspberry Pi 5 | 50 | 10 | 12 | 16 GB | — | 3 GB | — | 128 GB | 0.5 | 100 s | 5 |
+| 🟩 Jetson Orin Nano | 400 | 50 | 25 | 8 GB | — | 4 GB | — | 64 GB | 4.5 | 89 s | 17 |
+| 🟦 Mini PC N100 | 3,000 | 300 | 35 | 16 GB | — | 7 GB | — | 512 GB | 48 | 62 s | 60 |
+| 🔶 AMD AI Halo | 25,000 | 2,000 | 120 | 128 GB | 96 GB | 24 GB | 22 GB | 2 TB | 550 | 45 s | 250 |
+| 🎮 Quad-5090 WS | 200,000 | 12,000 | 2,000 | 128 GB | 128 GB | 12 GB | 46 GB | 4 TB | 5,400 | 37 s | 1,000 |
+| ⚡ DGX Spark | 1.5M | 70,000 | 170 | 128 GB | 128 GB | 126 GB | 126 GB | 4 TB | 44,100 | 34 s | 3,150 |
+| 🖥️ 1U 8×H200 | 12M | 400,000 | 8,000 | 2 TB | 1,128 GB | 64 GB | 263 GB | 60 TB | 374,000 | 32 s | 11,333 |
+| 🏗️ NVL72 Rack | 100M | 2.5M | 120,000 | 9 TB | 13,824 GB | 128 GB | 1,323 GB | 250 TB | 3.5M | 29 s | 40,000 |
+| 🏭 Data Hall | 1B | 20M | 1M | 295 TB | 442 TB | 4 TB | 42 TB | 8 PB | 35M | 29 s | 333K |
+| 🌐 Campus | 12B | 160M | 8M | 2.36 PB | 3.54 PB | 32 TB | 338 TB | 64 PB | 320M | 37 s | 2M |
 
-- ~30 s: second Raspberry Pi
-- ~2–3 min: Orin Nano online
-- ~8–10 min: Mini PC, first marketing blitz
-- ~20–30 min: AMD AI Halo serving 32B models
-- ~1–2 h: DGX Spark, DeepSeek-R1 236B
-- ~1 day: first rack-mount servers and NVL72 racks
+RAM/VRAM "use" = the tier's default model footprint (4-bit weights + KV
+cache + overhead). It is display data, but it is **real**: when the active
+model changes, eligible units switch to the model's footprint, so the bars
+move exactly as the fleet behaves.
 
-(Exact times depend on click rate and marketing timing.)
+## Models (one-time licenses)
 
-## Prestige (IPO)
+License payback assumes the model is served on its tier's hardware at full
+load (Δ revenue / license cost).
 
-- IPO available when **lifetime** earnings (never reset) hit 1B CC; each
-  subsequent IPO needs ×10 more lifetime earnings (1B, 10B, 100B…).
-- Going public resets credits, hardware, upgrades, marketing and users, but
-  gives a **permanent +25%** multiplier on all earnings (click + passive).
-- Each IPO also awards **one investor perk** (player's choice):
+| Model | Params | License | Min tier | Disk | RAM/srv | VRAM/srv | Speed | Rev × | Tok/s per user | License payback |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 🐜 TinyLlama | 1.5B | free | 0 | 1.1 GB | 3 GB | — | 1.0 | 1.0 | 2 | — |
+| 🐿️ Llama 3.2 | 3B | 200 | 1 | 2.4 GB | 4 GB | — | 1.0 | 1.8 | 3 | 74 s |
+| 🐕 Llama 3.1 | 8B | 1,500 | 2 | 4.9 GB | 7 GB | — | 1.0 | 3.2 | 5 | 71 s |
+| 🐆 Qwen2.5 | 32B | 12,000 | 3 | 19 GB | 24 GB | 22 GB | 1.0 | 5.5 | 8 | 52 s |
+| 🦁 Llama 3.3 | 70B | 90,000 | 4 | 40 GB | 12 GB | 46 GB | 1.0 | 9 | 12 | 43 s |
+| 🐋 DeepSeek-R1 | 236B | 700,000 | 5 | 120 GB | 126 GB | 126 GB | 0.9 | 14 | 20 | 31 s |
+| 🦅 Maverick | 400B | 5M | 6 | 229 GB | 64 GB | 263 GB | 0.85 | 22 | 30 | 27 s |
+| 🦖 Behemoth | 2T | 40M | 7 | 1,150 GB | 128 GB | 1,323 GB | 0.8 | 35 | 50 | 25 s |
+| 🐉 Cluster | multi-rack | 300M | 8 | 36.8 TB | 4 TB | 42 TB | 1.0 | 35 | 60 | —* |
+| 🌌 Frontier | hyperscale | 2.5B | 9 | 294 TB | 32 TB | 338 TB | 1.0 | 40 | 80 | —* |
 
-| Perk | Effect | Stacking |
-|---|---|---|
-| 💰 Venture Money | +10% earnings | additive, uncapped |
-| 📈 Growth Hacker | +0.15%/s user growth | additive into R |
-| 🛠️ Hardware Partner | -1.5% hardware cost growth | growth floor at 5% (1.05) |
+\* Cluster/Frontier are capacity-tier models: their license mostly gates the
+endgame and pays itself back over the tier's life, not in seconds.
 
-- Venture Money stacks with the base +25% into `prestigeMult`:
-  `1 + 0.25×ipos + 0.10×venture`.
-- Hardware Partner shrinks the per-copy cost multiplier (1.13 → 1.05 at 5
-  perks), which matters most in the late game where you buy many copies of
-  one tier. Requirement growth (×10) vs bonus growth keeps IPO #2+ landing
-  at roughly the same point in each run.
-
-## Model library
-
-Models are now **separate one-time licenses** (shop tab 🧠 Models). Owning a
-model puts it on your disk forever; the best owned model your fleet can host
-becomes the active model.
-
-- `minTier` gates models to hardware: you need at least one unit of that tier.
-- `diskGB` adds to the permanent library footprint (disk bar).
-- `ramGB` / `vramGB` are per-replica serving memory: every unit at or above
-  the model's tier runs a replica at the model's footprint; older units keep
-  their default model's footprint.
-- `speed` scales fleet capacity (bigger MoEs are slower per unit).
-- License costs follow the same ~×8 curve as hardware (0 → 2.5B).
-
-Resource bars now reflect real management tradeoffs: licensing a bigger model
-fills disk, and switching to it (it auto-activates when hostable) pushes RAM /
-VRAM usage up.
-
-## News events
-
-Roughly every ~3 minutes a random event fires (one active at a time, 15–120 s):
-
-| Event | Effect |
-|---|---|
-| 🎉 Model release frenzy | ×2 user growth |
-| ☁️ MegaCorp cloud outage | ×1.5 revenue |
-| 🐦 Viral tweet | ×3 click power |
-| 📰 Tech press feature | +100 users, ×1.5 growth |
-| ⚡ Power surge | 0 revenue, 15 s |
-| 🧯 Security drill PR blowup | negative growth |
-| 🏷️ Supplier flash sale | -30% hardware prices |
-| 📡 Backhoe vs fiber | ×0.5 revenue |
-
-Events also write to the activity feed and show a countdown banner. They are
-persisted (with their end timestamps), so they survive reloads but never
-stack during offline play.
+Owning a model stores it on disk **forever** (the Disk bar is your library).
+The best owned model your fleet can host auto-activates. A bigger model
+raises revenue per token AND per-user load — every upgrade is a real
+capacity decision.
 
 ## Power grid
 
-Hardware draws watts; your generators must cover the draw or the fleet
-**throttles**: served capacity scales by `supply / demand` (floor 10%), and
-latency blows up. Power is a real build order now — you buy servers AND the
-watts to feed them.
+Supply must cover demand or the fleet **throttles**: capacity ×=
+supply/demand (floor 10%), and latency +500 ms per missing fraction.
+~×7.5 cost per tier, ~750 CC/kW early falling to ~120 CC/kW at the top
+(scale economies).
 
-| Source | kW | Cost |
+| Source | kW | Cost | CC/kW | Covers |
+|---|---:|---:|---:|---|
+| 🔌 Garage outlet | 1.5 | free | — | 2× Pi 5 clusters |
+| ☀️ Rooftop solar | 5 | 2,000 | 400 | 40× Pi 5 / 40× Halo |
+| ⛽ Gas generator | 20 | 15,000 | 750 | first GPU rigs |
+| 🌬️ Wind turbine | 50 | 40,000 | 800 | 6× H200 servers |
+| 🛢️ Diesel bank | 150 | 120,000 | 800 | 1× NVL72 rack |
+| 🌞 Solar farm | 500 | 400,000 | 800 | 4× NVL72 racks |
+| 🔋 Substation | 2,000 | 1.5M | 750 | half a data hall |
+| 🏭 Gas turbine | 10,000 | 6M | 600 | 10 data halls |
+| ☢️ SMR | 50,000 | 30M | 600 | 50 halls / 6 campuses |
+| ⚛️ Fusion | 500,000 | 200M | 400 | 60 campuses |
+| 🛰️ Orbital solar | 5M | 1.5B | 300 | 600 campuses |
+| 🌌 Dyson swarm | 100M | 12B | 120 | the rest of the game |
+
+Intentional friction: the 2 kW Quad-5090 rig cannot run on the free 1.5 kW
+outlet — your first workstation forces the first real power purchase
+(15K CC, ~7.5% on top of the rig).
+
+## Marketing
+
+Instant users are sized to **2–5× the user base at the stage you can afford
+them** (spiking to 20× capacity was wasted: revenue caps at capacity
+anyway). Growth boosts are the permanent value.
+
+| Campaign | Cost | +Users | +Growth/s | Buy at ~ |
+|---|---:|---:|---:|---|
+| 🧵 Reddit | 150 | 25 | +0.001 | 2–3 min |
+| 💬 Discord | 1,200 | 120 | +0.0015 | ~8 min |
+| 🎬 YouTube review | 9,000 | 500 | +0.002 | ~20 min |
+| 📰 Hacker News | 70,000 | 2,000 | +0.003 | ~1 h |
+| 🎤 Conference keynote | 600,000 | 6,000 | +0.004 | ~3 h |
+| 📺 TV segment | 5M | 20,000 | +0.006 | ~8 h |
+| 🏈 Super Bowl ad | 45M | 80,000 | +0.008 | ~1 day |
+
+Max R = 0.005 + 0.0255 + growth perks ≈ 3.6%/s → user doubling ~19 s late
+game, which keeps campuses fillable (2M users) without hours of waiting.
+
+## Clicking
+
+Base click 1 CC; 12 one-time upgrades total ~81,000 CC/click with a ×4–5
+cost curve (50 CC → 8B CC). Clicking carries the first ~5 minutes, then
+passive serving takes over — the classic clicker arc. Click power scales
+with prestige and the 🐦 viral-tweet event.
+
+## News events
+
+One active at a time, ~every 3 minutes, 15–120 s each. All multipliers are
+multiplicative with the permanent systems.
+
+| Event | Duration | Effect |
+|---|---:|---|
+| 🎉 Model release frenzy | 90 s | ×2 user growth |
+| ☁️ MegaCorp cloud outage | 120 s | ×1.5 revenue |
+| 🐦 Viral tweet | 45 s | ×3 click power |
+| 📰 Tech press feature | 60 s | +100 users, ×1.5 growth |
+| ⚡ Power surge | 15 s | 0 revenue |
+| 🔌 Grid blackout | 60 s | power supply ×0.4 → throttle! |
+| 🧯 Security drill PR blowup | 60 s | negative growth |
+| 🏷️ Supplier flash sale | 120 s | hardware −30% |
+| 📡 Backhoe vs fiber | 90 s | ×0.5 revenue |
+
+## Prestige (IPO)
+
+- Available at **1B lifetime** earnings; each next IPO ×10 (1B, 10B, 100B…).
+- Resets credits/hardware/models/power/marketing/users to the starting
+  state, keeps a permanent **+25%** to all earnings, plus one perk pick:
+
+| Perk | Effect | Roughly equal to |
 |---|---|---|
-| 🔌 Garage outlet | 1.5 | free |
-| ☀️ Rooftop solar | 5 | 2,000 |
-| ⛽ Gas generator | 20 | 15,000 |
-| 🌬️ Wind turbine | 50 | 40,000 |
-| 🛢️ Diesel bank | 150 | 120,000 |
-| 🌞 Solar farm | 500 | 400,000 |
-| 🔋 Substation | 2,000 | 1.5M |
-| 🏭 Gas turbine | 10,000 | 6M |
-| ☢️ SMR | 50,000 | 30M |
-| ⚛️ Fusion | 500,000 | 200M |
-| 🛰️ Orbital solar | 5M | 1.5B |
-| 🌌 Dyson swarm | 100M | 12B |
+| 💰 Venture Money | +10% earnings each | +10% income |
+| 📈 Growth Hacker | +0.15%/s growth each | +30% base growth |
+| 🛠️ Hardware Partner | −1.5% per-copy cost growth (floor 1.05) | −30% cost of a 20-copy fleet |
 
-Cost grows ~×7.5 per tier and ×1.15 per copy. You start with a 1.5 kW wall
-outlet — enough for early Pi clusters, but the first GPU rig forces a real
-power decision, and each hardware tier pulls you up the power ladder
-(1U servers ≈ gas generators, NVL72 racks ≈ solar farms, campuses ≈ SMRs).
-Electricity cost (credits/s) is still charged as a fuel/maintenance line and
-shows in the ops panel.
+The three perks are within ~2× of each other at every stage; Venture scales
+best late, Growth early, Partner when buying many copies of one tier.
 
-## Demand per user (tokens/s)
+## Milestone pacing targets
 
-Each concurrent user consumes more tokens as models grow: 2 (1.5B) → 3 (3B)
-→ 5 (8B) → 8 (32B) → 12 (70B) → 20 (236B) → 30 (400B) → 50 (2T) → 60
-(cluster) → 80 (frontier). Combined with the revMult curve, bigger models
-raise both revenue-per-token and per-user load, so expansion pressure grows
-with every upgrade.
+- ~20 s: third Raspberry Pi
+- ~2 min: Orin Nano online
+- ~6–8 min: Mini PC + first marketing
+- ~15–25 min: AMD AI Halo serving 32B
+- ~1 h: DGX Spark, DeepSeek-R1 236B
+- ~1 day: first NVL72 racks and data halls
 
-## Network (flavor)
+(Exact times depend on click rate, marketing timing, and news events.)
 
-`netMBps = servedTps / 50` — a display-only figure so the ops panel has a
-network number that scales with throughput.
+## Flavor stats (display-only)
+
+- **Network**: `netMBps = servedTps / 50`.
+- **Latency**: `20 + 18×load + queue/40 + 500×(1−powerFactor)` ms.
+- **Electricity**: `watts × 0.001` CC/s — small but non-trivial at campus
+  scale (8 MW ≈ 2.5% of campus revenue), and nearly free on efficient
+  high-tier GPUs (revenue-per-watt grows ~100× up the ladder — on purpose:
+  bigger hardware is more profitable per watt).
+
