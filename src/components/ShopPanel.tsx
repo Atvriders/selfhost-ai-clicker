@@ -68,7 +68,7 @@ export default function ShopPanel({ d }: Props) {
                   <span>🧠 {fmtBytes(h.ramGB)} RAM</span>
                   <span>🎛️ {h.vramGB > 0 ? fmtBytes(h.vramGB) + ' VRAM' : 'CPU-only'}</span>
                   <span>💾 {fmtBytes(h.diskGB)} on disk</span>
-                  <span>⚡ {h.watts >= 1000 ? fmt(h.watts / 1000) + ' kW' : h.watts + ' W'}</span>
+                  <span>⚡ {fmtKW(h.watts / 1000)}</span>
                   <span>🤖 {h.model}</span>
                   <span>💰 up to {fmt(fullRev)}/s</span>
                 </div>
